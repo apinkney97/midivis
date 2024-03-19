@@ -1,0 +1,76 @@
+PlayingTrackInfo, Controls, TrackInfo, PlaylistManager {
+    margin: 1;
+    padding: 0;
+}
+
+Controls {
+    layout: horizontal;
+    background: $boost;
+    height: 3;
+    min-width: 50;
+}
+
+TimeDisplay {
+    content-align: center middle;
+    text-opacity: 60%;
+    height: 3;
+}
+
+Button {
+    width: 6;
+    min-width: 6;
+}
+
+VoiceInfo, NotesContainer {
+    height: 16;
+}
+
+VoiceInfo {
+    width: 20;
+}
+
+NotesContainer {
+    width: 100%;
+}
+
+TrackInfo {
+    layout: horizontal;
+    /*grid-size: 2 1;*/
+}
+
+PlaylistManager {
+    layout: horizontal;
+    height: 1fr;
+    min-height: 10;
+}
+
+SearchWidget {
+    layout: vertical;
+    width: 1fr;
+}
+
+
+#pause {
+    display: none;
+}
+
+
+#playlist_buttons {
+    width: 5;
+}
+
+#playlist {
+    width: 1fr;
+    max-width: 50;
+}
+
+
+#search_box {
+    height: 1;
+    width: 1fr;
+}
+
+#search_results_table {
+    height: 1fr;
+    width: 100%;
+}
