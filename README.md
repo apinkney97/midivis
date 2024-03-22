@@ -49,4 +49,4 @@ Note: I have only tested this on Ubuntu and Raspberry Pi OS.
 
 ## TODO:
 - Replace play.py with a [textual](https://github.com/Textualize/textual) UI (currently WIP)
-- Decouple terminal UI from MIDI playback to support multiple simultaneous outputs (terminal, WLED, MIDI synthesizer).
+- Actually support output to WLED
