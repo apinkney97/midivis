@@ -15,7 +15,6 @@ from midivis.midi_metadata import (
     PERCUSSION_CHANNEL,
     PROGRAMS,
 )
-from midivis.utils import log
 
 
 def color_from_hsv(hue: float, saturation: float, value):
@@ -51,7 +50,7 @@ class Display:
         title: str,
         duration_secs: float,
         progress_secs: float = 0.0,
-        lower_limit: int = 16,
+        lower_limit: int = 0,
         note_range: int = 100,
     ):
         self.title = title
@@ -63,9 +62,9 @@ class Display:
         self.lower_limit = lower_limit
         self.upper_limit = lower_limit + note_range
 
-    def update(self, message: Message, progress_secs: float) -> bool:
+    def update(self, message: Message, progress_secs: float) -> None:
         """
-        Returns True if the display needs to be updated, False otherwise.
+        Updates the internal state with the given MIDI message.
         """
         self.progress_secs = progress_secs
         match message.type:
@@ -82,17 +81,12 @@ class Display:
                 channel.program = message.program
             case "control_change":
                 channel = self.channels[message.channel]
-                if message.control == 7:
-                    channel.volume = message.value
-            case _:
-                log(1, message)
+                match message.control:
+                    case 7:
+                        channel.volume = message.value
+                        self.needs_redraw = True
 
-        # This is probably wrong, as only the first of simultaneous changes will be applied.
-        # Really we need to batch simultaneous messages...
-        needs_redraw = self.needs_redraw and message.time > 0
-        return needs_redraw
-
-    def render_channel_data(self) -> Panel:
+    def to_panel(self, with_instruments: bool = True) -> Panel:
         """
         Returns a rich Panel representing the currently playing notes.
         """
@@ -117,17 +111,18 @@ class Display:
                 else:
                     notes.append("\u25af")
 
-            instrument_name = (
-                "Percussion"
-                if channel_num == PERCUSSION_CHANNEL
-                else PROGRAMS[channel.program + 1]
-            )
-            # text.append(f"Track {channel_num:02d}: ")
-            text.append(
-                f"vol:0x{channel.volume:02x}     {instrument_name}",
-                style=Style(color=color_from_hsv(hue, sat, max(0.2, max_val))),
-            )
-            text.append("\n")
+            if with_instruments:
+                instrument_name = (
+                    "Percussion"
+                    if channel_num == PERCUSSION_CHANNEL
+                    else PROGRAMS[channel.program + 1]
+                )
+                # text.append(f"Track {channel_num:02d}: ")
+                text.append(
+                    f"vol:0x{channel.volume:02x}     {instrument_name}",
+                    style=Style(color=color_from_hsv(hue, sat, max(0.2, max_val))),
+                )
+                text.append("\n")
 
             for note in notes:
                 text.append(note)
@@ -138,6 +133,8 @@ class Display:
 
         duration_td = timedelta(seconds=int(self.duration_secs))
         pos_td = timedelta(seconds=int(self.progress_secs))
+
+        self.needs_redraw = False
 
         return Panel.fit(
             text,

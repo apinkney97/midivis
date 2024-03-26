@@ -12,43 +12,66 @@ from midivis.display import Display
 from midivis.utils import get_console, log
 
 
-class AsyncMidiFile(mido.MidiFile):
-    async def play_async(
-        self, meta_messages: bool = False, start_secs: float = 0.0
-    ) -> AsyncIterator[tuple[mido.Message | mido.MetaMessage, float]]:
-        """
-        Async generator that yields MIDI messages in real time.
+async def play_async(
+    midi_file: mido.MidiFile,
+    meta_messages: bool = False,
+    start_secs: float = 0.0,
+    synth_port=None,
+) -> AsyncIterator[tuple[list[mido.Message | mido.MetaMessage], float]]:
+    """
+    Async generator that yields MIDI messages in real time.
 
-        This is brodly equivalent to `play()` on the superclass,
-        but uses async sleeps instead of blocking ones.
-        """
+    This is similar to `MidiFile.play()`, except that it:
+        - uses async sleeps instead of blocking ones
+        - groups simultaneous messages together
+    """
 
-        # TODO: Group simultaneous messages
+    abs_start_time = time.monotonic() - start_secs
+    progress_secs = 0.0
 
-        start_time = time.monotonic() - start_secs
-        progress_secs = 0.0
+    message_group = []
 
-        for message in self:
+    for message in midi_file:
+        want_message = True
+
+        if isinstance(message, mido.MetaMessage) and not meta_messages:
+            want_message = False
+
+        if progress_secs < start_secs and message.type in {"note_on", "note_off"}:
+            # Skip note on/off messages before we start. Note that
+            # we must not skip other messages since they may have
+            # side-effects, eg `program_change`. This does mean
+            # that any notes whose `note_off` has not yet occurred
+            # at `start_secs` will not be sounding.
+            want_message = False
+
+        if message.time > 0:
+            # yield the previous group (if nonempty)
+            if message_group:
+                yield message_group, progress_secs
+
+            # start a new group with the message
+            message_group = [message] if want_message else []
+
+            # sleep until the message should be played
             progress_secs += message.time
 
-            playback_time = time.monotonic() - start_time
+            playback_time = time.monotonic() - abs_start_time
             seconds_to_next_event = progress_secs - playback_time
 
             if seconds_to_next_event > 0:
                 await asyncio.sleep(seconds_to_next_event)
 
-            if isinstance(message, mido.MetaMessage) and not meta_messages:
-                continue
+        elif want_message:
+            # message has time 0; append it to the existing group
+            message_group.append(message)
 
-            if progress_secs < start_secs and message.type in {"note_on", "note_off"}:
-                # Skip note on/off messages before we start. Note that
-                # we must not skip other messages since they may have
-                # side-effects, eg `program_change`. This does mean
-                # that any notes whose `note_off` has not yet occurred
-                # at `start_secs` will not be sounding.
-                continue
+        if want_message and synth_port is not None:
+            synth_port.send(message)
 
-            yield message, progress_secs
+    # yield any final group:
+    if message_group:
+        yield message_group, progress_secs
 
 
 @contextmanager
@@ -75,23 +98,26 @@ def port():
 
 
 async def play(synth_port, midi_path: pathlib.Path, start_secs: float = 0.0) -> None:
-    mf = AsyncMidiFile(midi_path, clip=True)
+    mf = mido.MidiFile(filename=midi_path, clip=True)
 
     display = Display(
         title=str(midi_path), duration_secs=mf.length, progress_secs=start_secs
     )
 
     with Live(console=get_console(), auto_refresh=False) as live:
-        async for message, progress_secs in mf.play_async(start_secs=start_secs):
-            synth_port.send(message)
-            needs_redraw = display.update(message, progress_secs)
+        async for messages, progress_secs in play_async(
+            mf, start_secs=start_secs, synth_port=synth_port
+        ):
+            # TODO: Consider splitting out "play" into its own thread/process
 
-            if needs_redraw:
-                live.update(display.render_channel_data())
-                live.refresh()
+            for message in messages:
+                display.update(message, progress_secs)
 
-        live.update("")
-        live.refresh()
+            if display.needs_redraw:
+                live.update(display.to_panel(with_instruments=False), refresh=True)
+
+        # Clear the screen at the end
+        live.update("", refresh=True)
 
 
 def play_many(paths: Iterable[pathlib.Path]) -> None:
