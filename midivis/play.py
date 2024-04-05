@@ -12,6 +12,34 @@ from midivis.display import Display
 from midivis.utils import get_console, log
 
 
+# class Player:
+#     def __init__(self):
+#         pass
+#
+#     async def play(self):
+#         pass
+#
+#     async def pause(self):
+#         pass
+#
+#     async def skip(self, seconds: float = 10):
+#         pass
+#
+#     # Playlist management
+#
+#     async def add_track(self, track: Track):
+#         pass
+#
+#     async def remove_track(self, playlist_id: int):
+#         pass
+#
+#     async def bump_track_up(self, playlist_id: int):
+#         pass
+#
+#     async def bump_track_down(self, playlist_id: int):
+#         pass
+#
+#
 async def play_async(
     midi_file: mido.MidiFile,
     meta_messages: bool = False,

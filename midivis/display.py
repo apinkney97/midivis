@@ -13,8 +13,8 @@ from midivis.midi_metadata import (
     NOTES_PER_CHANNEL,
     NUM_CHANNELS,
     PERCUSSION_CHANNEL,
-    PROGRAMS,
 )
+from midivis.wled import OFF, RGBColor
 
 
 def color_from_hsv(hue: float, saturation: float, value):
@@ -86,43 +86,59 @@ class Display:
                         channel.volume = message.value
                         self.needs_redraw = True
 
+    def to_colors(self) -> list[list[RGBColor]]:
+        """Returns a list of colors per channel"""
+        channels = []
+
+        for channel_num, channel in enumerate(self.channels, start=1):
+            channels.append([])
+
+            hue = channel.program / 0x7F  # Colour by instrument
+            sat = 0 if channel_num == PERCUSSION_CHANNEL else 1  # Make percussion white
+
+            volume_fraction = channel.volume / 0x7F
+
+            for velocity in islice(
+                channel.velocities, self.lower_limit, self.upper_limit
+            ):
+                val = velocity / 127 * volume_fraction  # louder => brighter
+                if val == 0:
+                    color = OFF
+                else:
+                    color = RGBColor.from_hsv(hue, sat, val)
+                channels[-1].append(color)
+
+        return channels
+
     def to_panel(self, with_instruments: bool = True) -> Panel:
         """
         Returns a rich Panel representing the currently playing notes.
         """
         text = Text()
 
-        for channel_num, channel in enumerate(self.channels, start=1):
-            hue = channel.program / 127  # Colour by instrument
-            sat = 0 if channel_num == PERCUSSION_CHANNEL else 1  # Make percussion white
-
+        for channel_num, colors in enumerate(self.to_colors(), start=1):
             notes = []
-            max_val = 0
-            volume_fraction = channel.volume / 0x7F
 
-            for velocity in islice(
-                channel.velocities, self.lower_limit, self.upper_limit
-            ):
-                if velocity:
-                    val = velocity / 127 * volume_fraction  # louder => brighter
-                    max_val = max(max_val, val)
-                    style = Style(color=color_from_hsv(hue, sat, val))
+            for color in colors:
+                if color is not OFF:
+                    style = Style(color=Color.from_rgb(*color))
                     notes.append(Text("\u25ae", style=style))
                 else:
                     notes.append("\u25af")
 
-            if with_instruments:
-                instrument_name = (
-                    "Percussion"
-                    if channel_num == PERCUSSION_CHANNEL
-                    else PROGRAMS[channel.program + 1]
-                )
-                # text.append(f"Track {channel_num:02d}: ")
-                text.append(
-                    f"vol:0x{channel.volume:02x}     {instrument_name}",
-                    style=Style(color=color_from_hsv(hue, sat, max(0.2, max_val))),
-                )
-                text.append("\n")
+            # TODO: fix this
+            # if with_instruments:
+            #     instrument_name = (
+            #         "Percussion"
+            #         if channel_num == PERCUSSION_CHANNEL
+            #         else PROGRAMS[channel.program + 1]
+            #     )
+            #     # text.append(f"Track {channel_num:02d}: ")
+            #     text.append(
+            #         f"vol:0x{channel.volume:02x}     {instrument_name}",
+            #         style=Style(color=color_from_hsv(hue, sat, max(0.2, max_val))),
+            #     )
+            #     text.append("\n")
 
             for note in notes:
                 text.append(note)
