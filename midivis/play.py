@@ -1,45 +1,65 @@
 import asyncio
+import itertools
 import pathlib
 import subprocess
 import time
 from contextlib import contextmanager
-from typing import AsyncIterator, Iterable
+from typing import AsyncIterator, Iterable, Iterator
 
 import mido
 from rich.live import Live
 
 from midivis.display import Display
 from midivis.utils import get_console, log
+from midivis.wled import set_leds_all
 
 
-# class Player:
-#     def __init__(self):
-#         pass
-#
-#     async def play(self):
-#         pass
-#
-#     async def pause(self):
-#         pass
-#
-#     async def skip(self, seconds: float = 10):
-#         pass
-#
-#     # Playlist management
-#
-#     async def add_track(self, track: Track):
-#         pass
-#
-#     async def remove_track(self, playlist_id: int):
-#         pass
-#
-#     async def bump_track_up(self, playlist_id: int):
-#         pass
-#
-#     async def bump_track_down(self, playlist_id: int):
-#         pass
-#
-#
+class Track:
+    pass
+
+
+class Player:
+    def __init__(self):
+        self._listeners = []
+        pass
+
+    async def play(self) -> None:
+        pass
+
+    async def pause(self) -> None:
+        pass
+
+    async def seek(self, delta_seconds: float = 10) -> None:
+        pass
+
+    async def stop(self) -> None:
+        pass
+
+    async def next(self) -> None:
+        pass
+
+    async def previous(self) -> None:
+        pass
+
+    async def listen(self) -> Iterator[...]:
+        """Listen to MIDI events"""
+        pass
+
+    # Playlist management
+
+    async def add_track(self, track: Track) -> None:
+        pass
+
+    async def remove_track(self, playlist_id: int) -> None:
+        pass
+
+    async def bump_track_up(self, playlist_id: int) -> None:
+        pass
+
+    async def bump_track_down(self, playlist_id: int) -> None:
+        pass
+
+
 async def play_async(
     midi_file: mido.MidiFile,
     meta_messages: bool = False,
@@ -125,7 +145,28 @@ def port():
             timidity_handle.terminate()
 
 
-async def play(synth_port, midi_path: pathlib.Path, start_secs: float = 0.0) -> None:
+async def play_wled(
+    synth_port, midi_path: pathlib.Path, start_secs: float = 0.0
+) -> None:
+    mf = mido.MidiFile(filename=midi_path, clip=True)
+
+    display = Display(
+        title=str(midi_path), duration_secs=mf.length, progress_secs=start_secs
+    )
+
+    async for messages, progress_secs in play_async(
+        mf, start_secs=start_secs, synth_port=synth_port
+    ):
+        for message in messages:
+            display.update(message, progress_secs)
+
+        if display.needs_redraw:
+            set_leds_all(itertools.chain(*display.to_colors()))
+
+
+async def play_terminal(
+    synth_port, midi_path: pathlib.Path, start_secs: float = 0.0
+) -> None:
     mf = mido.MidiFile(filename=midi_path, clip=True)
 
     display = Display(
@@ -156,7 +197,7 @@ async def _play_many(paths: Iterable[pathlib.Path]) -> None:
     with port() as synth_port:
         for path in paths:
             try:
-                await play(synth_port, path)
+                await play_wled(synth_port, path)
             except Exception as e:
                 log(0, f"{type(e).__name__}: {e}")
                 raise

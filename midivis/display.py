@@ -107,6 +107,7 @@ class Display:
                 else:
                     color = RGBColor.from_hsv(hue, sat, val)
                 channels[-1].append(color)
+        self.needs_redraw = False
 
         return channels
 
@@ -122,9 +123,10 @@ class Display:
             for color in colors:
                 if color is not OFF:
                     style = Style(color=Color.from_rgb(*color))
-                    notes.append(Text("\u25ae", style=style))
+                    notes.append(Text("\u25cf", style=style))
                 else:
-                    notes.append("\u25af")
+                    # notes.append("\u25af")
+                    notes.append(" ")
 
             # TODO: fix this
             # if with_instruments:
@@ -149,8 +151,6 @@ class Display:
 
         duration_td = timedelta(seconds=int(self.duration_secs))
         pos_td = timedelta(seconds=int(self.progress_secs))
-
-        self.needs_redraw = False
 
         return Panel.fit(
             text,

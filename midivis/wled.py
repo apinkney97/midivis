@@ -6,14 +6,12 @@ import colorsys
 import functools
 import itertools
 import time
-from typing import NamedTuple
+from typing import Iterable, NamedTuple
 
+import requests
 from more_itertools import run_length
-from requests import Session
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
 
-HOST = "192.168.1.149"
+HOST = "192.168.1.152"
 LEDS_WIDTH = 100
 LEDS_HEIGHT = 16
 NUM_LEDS = LEDS_WIDTH * LEDS_HEIGHT
@@ -25,38 +23,32 @@ class RGBColor(NamedTuple):
     g: int
     b: int
 
+    @functools.cache
     def __str__(self):
         return f"{self.r:02X}{self.g:02X}{self.b:02X}"
 
     @classmethod
+    @functools.cache
     def from_hsv(cls, hue: float, sat: float, val: float) -> "RGBColor":
         # h/s/v in range 0-1
         r, g, b = (int(x * 255) for x in colorsys.hsv_to_rgb(hue, sat, val))
         return cls(r, g, b)
 
 
-OFF = RGBColor(0, 0, 0)
-
-s = Session()
-retries = Retry(
-    total=3,
-    backoff_factor=0.1,
-    status_forcelist=[502, 503, 504],
-    allowed_methods={"POST"},
-)
-s.mount("http://", HTTPAdapter(max_retries=retries))
+OFF = RGBColor.from_hsv(0, 0, 0)
 
 
 def _set_state(data: dict) -> None:
     """Raw call to /json/state on the WLED API."""
     # import json; print(json.dumps(data)); return
-    resp = s.post(f"http://{HOST}/json/state", json=data)
+    resp = requests.post(f"http://{HOST}/json/state", json=data)
     resp.raise_for_status()
 
 
-def set_leds_all(colors: list[RGBColor]) -> None:
+def set_leds_all(colors: Iterable[RGBColor]) -> None:
     """Sets the LEDs to the specified colors."""
     # See https://kno.wled.ge/interfaces/json-api/#per-segment-individual-led-control
+    # TODO: split big calls up into multiple smaller ones
     _set_state({"seg": {"i": compress(colors)}})
 
 
@@ -69,7 +61,7 @@ def set_leds_sparse(colors: dict[int, RGBColor]) -> None:
     _set_state({"seg": {"i": leds}})
 
 
-def compress(colors: list[RGBColor]) -> list[str | int]:
+def compress(colors: Iterable[RGBColor]) -> list[str | int]:
     offset = 0
     compressed = []
     for color, size in run_length.encode(colors):
@@ -81,19 +73,6 @@ def compress(colors: list[RGBColor]) -> list[str | int]:
         offset += size
 
     return compressed
-
-
-@functools.cache
-def hsv_to_rgb(h: float, s: float, v: float) -> RGBColor:
-    # h: 0 - 360
-    # s: 0 - 1
-    # v: 0 - 1
-    # returns: RGBColor(r, g, b) values 0-255
-    def f(n):
-        k = (n + h / 60) % 6
-        return int(255 * (v - v * s * max(0, min(k, 4 - k, 1))))
-
-    return RGBColor(r=f(5), g=f(3), b=f(1))
 
 
 def main():
@@ -121,15 +100,18 @@ def chase():
         set_leds_all(values)
 
 
-def cycle_rainbow():
+def cycle_rainbow(cycle_length=100):
     last = time.perf_counter_ns()
-    for h in itertools.cycle(range(360)):
-        if h == 359:
+    for h in itertools.cycle(range(cycle_length)):
+        if h == cycle_length - 1:
             now = time.perf_counter_ns()
-            fps = 360 / ((now - last) / 1_000_000_000)
+            fps = cycle_length / ((now - last) / 1_000_000_000)
             print(f"{fps:.2f} fps")
             last = now
-        values = [hsv_to_rgb((h + i) % 360, 1, 1) for i in range(NUM_LEDS)]
+        values = [
+            RGBColor.from_hsv(hue=((h + i) % cycle_length) / cycle_length, sat=1, val=1)
+            for i in range(NUM_LEDS)
+        ]
         set_leds_all(values)
 
 
