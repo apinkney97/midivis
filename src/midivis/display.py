@@ -17,7 +17,7 @@ from midivis.midi_metadata import (
 from midivis.wled import OFF, RGBColor
 
 
-def color_from_hsv(hue: float, saturation: float, value):
+def color_from_hsv(hue: float, saturation: float, value: float) -> Color:
     r, g, b = (x * 255 for x in colorsys.hsv_to_rgb(hue, saturation, value))
     return Color.from_rgb(r, g, b)
 
@@ -52,7 +52,7 @@ class Display:
         progress_secs: float = 0.0,
         lower_limit: int = 0,
         note_range: int = 100,
-    ):
+    ) -> None:
         self.title = title
         self.duration_secs = duration_secs
         self.progress_secs = progress_secs
@@ -88,7 +88,7 @@ class Display:
 
     def to_colors(self) -> list[list[RGBColor]]:
         """Returns a list of colors per channel"""
-        channels = []
+        channels: list[list[RGBColor]] = []
 
         for channel_num, channel in enumerate(self.channels, start=1):
             channels.append([])
@@ -118,7 +118,7 @@ class Display:
         text = Text()
 
         for channel_num, colors in enumerate(self.to_colors(), start=1):
-            notes = []
+            notes: list[Text | str] = []
 
             for color in colors:
                 if color is not OFF:

@@ -1,23 +1,25 @@
+from typing import Any
+
 from rich.console import Console
 
 _VERBOSITY = 0
 _CONSOLE = Console()
 
 
-def get_console():
+def get_console() -> Console:
     return _CONSOLE
 
 
-def set_verbosity(verbosity):
+def set_verbosity(verbosity: int) -> None:
     global _VERBOSITY
     _VERBOSITY = verbosity
 
 
-def get_verbosity():
+def get_verbosity() -> int:
     return _VERBOSITY
 
 
-def log(verbosity: int, *args, **kwargs):
+def log(verbosity: int, *args: Any, **kwargs: Any) -> None:
     if verbosity <= get_verbosity():
         _CONSOLE.log(*args, **kwargs)
 

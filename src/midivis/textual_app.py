@@ -50,7 +50,7 @@ class SearchWidget(Static):
         yield Placeholder("search results table", id="search_results_table")
 
 
-class MidiVisApp(App):
+class MidiVisApp(App[int]):
     CSS_PATH = "midivis.tcss"
     BINDINGS = [
         ("d", "toggle_dark", "Toggle dark mode"),
@@ -65,13 +65,6 @@ class MidiVisApp(App):
         yield Controls()
         yield TrackInfo()
         yield PlaylistManager()
-
-    def action_toggle_dark(self) -> None:
-        """An action to toggle dark mode."""
-        self.dark = not self.dark
-
-    def action_quit(self) -> None:
-        self.exit()
 
 
 if __name__ == "__main__":

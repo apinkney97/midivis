@@ -10,10 +10,10 @@ from mido import MidiFile
 
 
 def analyse_files(base_path: Path) -> None:
-    notes = Counter()
-    note_ranges = Counter()
-    channels = Counter()
-    programs = Counter()
+    notes: Counter[int] = Counter()
+    note_ranges: Counter[int] = Counter()
+    channels: Counter[int] = Counter()
+    programs: Counter[int] = Counter()
 
     start = monotonic()
 
@@ -132,7 +132,7 @@ def analyse_files(base_path: Path) -> None:
     print(f"Total time: {timedelta(seconds=monotonic() - start)}")
 
 
-def draw_hist(data: Counter) -> None:
+def draw_hist(data: Counter[int]) -> None:
     if not data:
         print("No data")
         return
@@ -142,7 +142,7 @@ def draw_hist(data: Counter) -> None:
         print(f"{i:3d} | {bar:80s} | {data[i]:6d}")
 
 
-def init_db():
+def init_db() -> sqlite3.Connection:
     con = sqlite3.connect("midi.db")
     cur = con.cursor()
     cur.execute("""
@@ -166,7 +166,7 @@ def init_db():
     return con
 
 
-def main():
+def main() -> None:
     base_path = sys.argv[1] if len(sys.argv) >= 2 else "."
     analyse_files(Path(base_path))
 

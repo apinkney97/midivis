@@ -6,7 +6,7 @@ import colorsys
 import functools
 import itertools
 import time
-from typing import Iterable, NamedTuple
+from typing import Any, Iterable, NamedTuple
 
 import requests
 from more_itertools import run_length
@@ -24,7 +24,7 @@ class RGBColor(NamedTuple):
     b: int
 
     @functools.cache
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.r:02X}{self.g:02X}{self.b:02X}"
 
     @classmethod
@@ -38,7 +38,7 @@ class RGBColor(NamedTuple):
 OFF = RGBColor.from_hsv(0, 0, 0)
 
 
-def _set_state(data: dict) -> None:
+def _set_state(data: dict[str, Any]) -> None:
     """Raw call to /json/state on the WLED API."""
     # import json; print(json.dumps(data)); return
     resp = requests.post(f"http://{HOST}/json/state", json=data)
@@ -54,7 +54,7 @@ def set_leds_all(colors: Iterable[RGBColor]) -> None:
 
 def set_leds_sparse(colors: dict[int, RGBColor]) -> None:
     """Changes the colors of the specified LEDs only."""
-    leds = []
+    leds: list[str | int] = []
     for pos, color in colors.items():
         leds.append(pos)
         leds.append(str(color))
@@ -63,7 +63,7 @@ def set_leds_sparse(colors: dict[int, RGBColor]) -> None:
 
 def compress(colors: Iterable[RGBColor]) -> list[str | int]:
     offset = 0
-    compressed = []
+    compressed: list[str | int] = []
     for color, size in run_length.encode(colors):
         color_hex = str(color)
         if size == 1:
@@ -75,7 +75,7 @@ def compress(colors: Iterable[RGBColor]) -> list[str | int]:
     return compressed
 
 
-def main():
+def main() -> None:
     # cycle_rainbow()
     chase()
 
@@ -83,7 +83,7 @@ def main():
     # set_leds_sparse(colors)
 
 
-def chase():
+def chase() -> None:
     last = time.perf_counter_ns()
     for i in itertools.cycle(range(NUM_LEDS)):
         if i == 0:
@@ -100,7 +100,7 @@ def chase():
         set_leds_all(values)
 
 
-def cycle_rainbow(cycle_length=100):
+def cycle_rainbow(cycle_length: int = 100) -> None:
     last = time.perf_counter_ns()
     for h in itertools.cycle(range(cycle_length)):
         if h == cycle_length - 1:

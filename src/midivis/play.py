@@ -3,10 +3,12 @@ import itertools
 import pathlib
 import subprocess
 import time
+from collections.abc import AsyncIterator, Iterable, Iterator
 from contextlib import contextmanager
-from typing import AsyncIterator, Iterable, Iterator
+from typing import Any
 
 import mido
+from mido.ports import BaseOutput
 from rich.live import Live
 
 from midivis.display import Display
@@ -19,8 +21,8 @@ class Track:
 
 
 class Player:
-    def __init__(self):
-        self._listeners = []
+    def __init__(self) -> None:
+        # self._listeners = []
         pass
 
     async def play(self) -> None:
@@ -41,9 +43,9 @@ class Player:
     async def previous(self) -> None:
         pass
 
-    async def listen(self) -> Iterator[...]:
+    async def listen(self) -> Iterator[Any]:
         """Listen to MIDI events"""
-        pass
+        return iter([])
 
     # Playlist management
 
@@ -64,7 +66,7 @@ async def play_async(
     midi_file: mido.MidiFile,
     meta_messages: bool = False,
     start_secs: float = 0.0,
-    synth_port=None,
+    synth_port: BaseOutput | None = None,
 ) -> AsyncIterator[tuple[list[mido.Message | mido.MetaMessage], float]]:
     """
     Async generator that yields MIDI messages in real time.
@@ -77,7 +79,7 @@ async def play_async(
     abs_start_time = time.monotonic() - start_secs
     progress_secs = 0.0
 
-    message_group = []
+    message_group: list[mido.Message] = []
 
     for message in midi_file:
         want_message = True
@@ -123,9 +125,11 @@ async def play_async(
 
 
 @contextmanager
-def port():
+def port() -> Iterator[BaseOutput]:
     mido.set_backend("mido.backends.rtmidi/LINUX_ALSA")
     timidity_handle = None
+    synth_port: BaseOutput
+
     try:
         synth_port = mido.open_output("TiMidity port 0")
     except OSError:
@@ -146,7 +150,7 @@ def port():
 
 
 async def play_wled(
-    synth_port, midi_path: pathlib.Path, start_secs: float = 0.0
+    synth_port: BaseOutput, midi_path: pathlib.Path, start_secs: float = 0.0
 ) -> None:
     mf = mido.MidiFile(filename=midi_path, clip=True)
 
@@ -165,7 +169,7 @@ async def play_wled(
 
 
 async def play_terminal(
-    synth_port, midi_path: pathlib.Path, start_secs: float = 0.0
+    synth_port: BaseOutput, midi_path: pathlib.Path, start_secs: float = 0.0
 ) -> None:
     mf = mido.MidiFile(filename=midi_path, clip=True)
 
