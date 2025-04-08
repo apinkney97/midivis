@@ -29,12 +29,12 @@ class TrackInfo(Static):
 
 class VoiceInfo(Static):
     def compose(self) -> ComposeResult:
-        yield Placeholder("\n".join(f"voice {n+1}" for n in range(16)))
+        yield Placeholder("\n".join(f"voice {n + 1}" for n in range(16)))
 
 
 class NotesContainer(Static):  # TODO: Consider using HorizontalScroll
     def compose(self) -> ComposeResult:
-        yield Placeholder("\n".join(f"track {n+1}" for n in range(16)))
+        yield Placeholder("\n".join(f"track {n + 1}" for n in range(16)))
 
 
 class PlaylistManager(Static):

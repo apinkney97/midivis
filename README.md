@@ -17,10 +17,10 @@ So far as I know there is no other program that pushes MIDI visualisations to ad
 Note: I have only tested this on Ubuntu and Raspberry Pi OS.
 
 ### First time setup
-1. Install [Poetry](https://python-poetry.org/docs/#installation)
+1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
 2. Install this project's requirements:
    ```shell
-   poetry install
+   uv sync
    ```
 3. Install [TiMidity++](https://en.wikipedia.org/wiki/TiMidity%2B%2B):
    ```shell
@@ -35,7 +35,7 @@ Note: I have only tested this on Ubuntu and Raspberry Pi OS.
    ```
 2. Use `midivis play` to play your file(s) in the terminal:
    ```shell
-   poetry run midivis play <path-to-midi> [<path-to-more-midis>]
+   uv run midivis play <path-to-midi> [<path-to-more-midis>]
    ```
 
 ## Useful links

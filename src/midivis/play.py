@@ -197,7 +197,8 @@ async def _play_many(paths: Iterable[pathlib.Path]) -> None:
     with port() as synth_port:
         for path in paths:
             try:
-                await play_wled(synth_port, path)
+                # await play_wled(synth_port, path)
+                await play_terminal(synth_port, path)
             except Exception as e:
                 log(0, f"{type(e).__name__}: {e}")
                 raise

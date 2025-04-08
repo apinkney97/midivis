@@ -1,33 +1,51 @@
-[tool.poetry]
-name = "midivis"
-version = "0.1.0"
+[project]
+authors = [{email = "3755307+apinkney97@users.noreply.github.com", name = "Alex Pinkney"}]
+dependencies = [
+  "mido>=1.3.3",
+  "more-itertools>=10.6.0",
+  "python-rtmidi>=1.5.8",
+  "requests>=2.32.3",
+  "rich>=14.0.0",
+  "textual>=3.0.1",
+  "typer[all]>=0.15.2",
+]
 description = "MIDI Visualiser"
-authors = ["Alex Pinkney <3755307+apinkney97@users.noreply.github.com>"]
+name = "midivis"
 readme = "README.md"
+requires-python = ">=3.12"
+version = "0.1.0"
 
-[tool.poetry.dependencies]
-python = "^3.12"
-mido = "^1.3.2"
-python-rtmidi = "^1.5.8"
-more-itertools = "^10.2.0"
-requests = "^2.31.0"
-rich = "^13.7.1"
-typer = {extras = ["all"], version = "^0.9.0"}
-textual = "^0.53.1"
-
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.3.1"
-textual-dev = "^1.5.1"
-ipython = "^8.23.0"
+[project.scripts]
+midivis = "midivis.__main__:app"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[dependency-groups]
+dev = [
+  "ipython>=9.1.0",
+  "mypy>=1.15.0",
+  "ruff>=0.11.4",
+  "textual-dev>=1.7.0",
+  "toml-sort>=0.24.2",
+]
+
+[tool.mypy]
+files = ["src"]
 
 [tool.ruff.lint]
 # Enable isort rules.
 extend-select = ["I"]
 
-[tool.poetry.scripts]
-midivis = 'midivis.__main__:app'
+[tool.tomlsort]
+sort_first = ["project"]
+sort_inline_tables = true
+sort_table_keys = true
+trailing_comma_inline_array = true
 
+[tool.tomlsort.overrides."dependency-groups.*"]
+inline_arrays = true
+
+[tool.tomlsort.overrides."project.dependencies"]
+inline_arrays = true
