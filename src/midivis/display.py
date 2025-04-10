@@ -21,12 +21,17 @@ def color_from_hsv(hue: float, saturation: float, value: float) -> Color:
     r, g, b = (x * 255 for x in colorsys.hsv_to_rgb(hue, saturation, value))
     return Color.from_rgb(r, g, b)
 
+FILLED_RECTANGLE = "\u25ae"
+EMPTY_RECTANGLE = "\u25af"
+FILLED_CIRCLE = "\u25cf"
+EMPTY_CIRCLE = "\u25cb"
 
 @dataclass
 class Channel:
     """
     Maintains the current state of a single MIDI channel
     """
+    num: int
 
     # Current instrument/voice
     program: int = 0
@@ -36,6 +41,8 @@ class Channel:
 
     # Notes and how loudly they are playing
     velocities: bytearray = field(default_factory=lambda: bytearray(NOTES_PER_CHANNEL))
+
+
 
 
 class Display:
@@ -50,17 +57,19 @@ class Display:
         title: str,
         duration_secs: float,
         progress_secs: float = 0.0,
-        lower_limit: int = 0,
-        note_range: int = 100,
     ) -> None:
         self.title = title
         self.duration_secs = duration_secs
         self.progress_secs = progress_secs
-        self.channels = [Channel() for _ in range(NUM_CHANNELS)]
+        self.channels = [Channel(num=i+1) for i in range(NUM_CHANNELS)]
 
         self.needs_redraw = False
-        self.lower_limit = lower_limit
-        self.upper_limit = lower_limit + note_range
+
+        self._colors = [[OFF] * NOTES_PER_CHANNEL for _ in range(NUM_CHANNELS)]
+
+    @property
+    def colors(self) -> list[list[RGBColor]]:
+        return self._colors
 
     def update(self, message: Message, progress_secs: float) -> None:
         """
@@ -71,93 +80,102 @@ class Display:
             case "note_on":
                 channel = self.channels[message.channel]
                 channel.velocities[message.note] = message.velocity
-                self.needs_redraw = True
+                self.set_note_color(channel, message.note)
+
             case "note_off":
                 channel = self.channels[message.channel]
                 channel.velocities[message.note] = 0
-                self.needs_redraw = True
+                self.set_note_color(channel, message.note)
+
             case "program_change":
                 channel = self.channels[message.channel]
                 channel.program = message.program
+                self.recolor_channel(channel)
+
             case "control_change":
                 channel = self.channels[message.channel]
                 match message.control:
                     case 7:
                         channel.volume = message.value
-                        self.needs_redraw = True
+                        self.recolor_channel(channel)
 
-    def to_colors(self) -> list[list[RGBColor]]:
-        """Returns a list of colors per channel"""
-        channels: list[list[RGBColor]] = []
+    def recolor_channel(self, channel: Channel):
+        for note in range(NOTES_PER_CHANNEL):
+            self.set_note_color(channel, note)
 
-        for channel_num, channel in enumerate(self.channels, start=1):
-            channels.append([])
+    def set_note_color(self, channel: Channel, note: int) -> None:
+        old_color = self._colors[channel.num-1][note]
 
+        velocity = channel.velocities[note]
+        if channel.volume == 0 or velocity == 0:
+            new_color = OFF
+
+        else:
             hue = channel.program / 0x7F  # Colour by instrument
-            sat = 0 if channel_num == PERCUSSION_CHANNEL else 1  # Make percussion white
+            sat = 0 if channel.num == PERCUSSION_CHANNEL else 1  # Make percussion white
 
             volume_fraction = channel.volume / 0x7F
+            val = velocity / 127 * volume_fraction  # louder => brighter
 
-            for velocity in islice(
-                channel.velocities, self.lower_limit, self.upper_limit
-            ):
-                val = velocity / 127 * volume_fraction  # louder => brighter
-                if val == 0:
-                    color = OFF
-                else:
-                    color = RGBColor.from_hsv(hue, sat, val)
-                channels[-1].append(color)
-        self.needs_redraw = False
+            new_color = RGBColor.from_hsv(hue, sat, val)
 
-        return channels
+        if new_color != old_color:
+            self._colors[channel.num-1][note] = new_color
+            self.needs_redraw = True
 
-    def to_panel(self, with_instruments: bool = True) -> Panel:
-        """
-        Returns a rich Panel representing the currently playing notes.
-        """
-        text = Text()
 
-        for channel_num, colors in enumerate(self.to_colors(), start=1):
-            notes: list[Text | str] = []
+def to_panel(display: Display, with_instruments: bool = True, lower_limit: int = 0, note_range: int = 100) -> Panel:
+    """
+    Returns a rich Panel representing the currently playing notes.
+    """
+    lower_limit = max(0, lower_limit)
+    upper_limit = min(NOTES_PER_CHANNEL, lower_limit + note_range)
 
-            for color in colors:
-                if color is not OFF:
-                    style = Style(color=Color.from_rgb(*color))
-                    notes.append(Text("\u25cf", style=style))
-                else:
-                    # notes.append("\u25af")
-                    notes.append(" ")
+    text = Text()
 
-            # TODO: fix this
-            # if with_instruments:
-            #     instrument_name = (
-            #         "Percussion"
-            #         if channel_num == PERCUSSION_CHANNEL
-            #         else PROGRAMS[channel.program + 1]
-            #     )
-            #     # text.append(f"Track {channel_num:02d}: ")
-            #     text.append(
-            #         f"vol:0x{channel.volume:02x}     {instrument_name}",
-            #         style=Style(color=color_from_hsv(hue, sat, max(0.2, max_val))),
-            #     )
-            #     text.append("\n")
+    for channel_num, colors in enumerate(display.colors, start=1):
+        notes: list[Text | str] = []
 
-            for note in notes:
-                text.append(note)
+        for color in islice(
+            colors, lower_limit, upper_limit
+        ):
+            if color is not OFF:
+                style = Style(color=Color.from_rgb(*color))
+                notes.append(Text(FILLED_RECTANGLE, style=style))
+            else:
+                notes.append(EMPTY_RECTANGLE)
+                # notes.append(" ")
 
-            text.append("\n")
+        # TODO: fix this
+        # if with_instruments:
+        #     instrument_name = (
+        #         "Percussion"
+        #         if channel_num == PERCUSSION_CHANNEL
+        #         else PROGRAMS[channel.program + 1]
+        #     )
+        #     # text.append(f"Track {channel_num:02d}: ")
+        #     text.append(
+        #         f"vol:0x{channel.volume:02x}     {instrument_name}",
+        #         style=Style(color=color_from_hsv(hue, sat, max(0.2, max_val))),
+        #     )
+        #     text.append("\n")
 
-        text.remove_suffix("\n")
+        for note in notes:
+            text.append(note)
 
-        duration_td = timedelta(seconds=int(self.duration_secs))
-        pos_td = timedelta(seconds=int(self.progress_secs))
+        text.append("\n")
 
-        return Panel.fit(
-            text,
-            title=f"[white]{self.title}[/white]",
-            subtitle=f"[white]{pos_td} / {duration_td}[/white]",
-            subtitle_align="right",
-            style=Style(
-                bgcolor=Color.from_rgb(0, 0, 0), color=Color.from_rgb(32, 32, 32)
-            ),
-        )
+    text.remove_suffix("\n")
+
+    duration_td = timedelta(seconds=int(display.duration_secs))
+    pos_td = timedelta(seconds=int(display.progress_secs))
+
+    return Panel.fit(
+        text,
+        title=f"[white]{display.title}[/white]",
+        subtitle=f"[white]{pos_td} / {duration_td}[/white]",
+        subtitle_align="right",
+        style=Style(
+            bgcolor=Color.from_rgb(0, 0, 0), color=Color.from_rgb(32, 32, 32)
+        ),
+    )

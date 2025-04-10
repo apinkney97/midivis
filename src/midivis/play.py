@@ -11,7 +11,7 @@ import mido
 from mido.ports import BaseOutput
 from rich.live import Live
 
-from midivis.display import Display
+from midivis.display import Display, to_panel
 from midivis.utils import get_console, log
 from midivis.wled import set_leds_all
 
@@ -32,6 +32,8 @@ class Player:
         pass
 
     async def seek(self, delta_seconds: float = 10) -> None:
+        # stop all notes
+        # iterate through all messages, ignoring note_on and note_off
         pass
 
     async def stop(self) -> None:
@@ -165,7 +167,7 @@ async def play_wled(
             display.update(message, progress_secs)
 
         if display.needs_redraw:
-            set_leds_all(itertools.chain(*display.to_colors()))
+            set_leds_all(itertools.chain(*display.colors))
 
 
 async def play_terminal(
@@ -174,7 +176,7 @@ async def play_terminal(
     mf = mido.MidiFile(filename=midi_path, clip=True)
 
     display = Display(
-        title=str(midi_path), duration_secs=mf.length, progress_secs=start_secs
+        title=str(midi_path.name), duration_secs=mf.length, progress_secs=start_secs
     )
 
     with Live(console=get_console(), auto_refresh=False) as live:
@@ -187,7 +189,7 @@ async def play_terminal(
                 display.update(message, progress_secs)
 
             if display.needs_redraw:
-                live.update(display.to_panel(with_instruments=False), refresh=True)
+                live.update(to_panel(display, with_instruments=False), refresh=True)
 
         # Clear the screen at the end
         live.update("", refresh=True)
