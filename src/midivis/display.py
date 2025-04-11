@@ -21,16 +21,19 @@ def color_from_hsv(hue: float, saturation: float, value: float) -> Color:
     r, g, b = (x * 255 for x in colorsys.hsv_to_rgb(hue, saturation, value))
     return Color.from_rgb(r, g, b)
 
+
 FILLED_RECTANGLE = "\u25ae"
 EMPTY_RECTANGLE = "\u25af"
 FILLED_CIRCLE = "\u25cf"
 EMPTY_CIRCLE = "\u25cb"
+
 
 @dataclass
 class Channel:
     """
     Maintains the current state of a single MIDI channel
     """
+
     num: int
 
     # Current instrument/voice
@@ -41,8 +44,6 @@ class Channel:
 
     # Notes and how loudly they are playing
     velocities: bytearray = field(default_factory=lambda: bytearray(NOTES_PER_CHANNEL))
-
-
 
 
 class Display:
@@ -58,14 +59,30 @@ class Display:
         duration_secs: float,
         progress_secs: float = 0.0,
     ) -> None:
-        self.title = title
-        self.duration_secs = duration_secs
-        self.progress_secs = progress_secs
-        self.channels = [Channel(num=i+1) for i in range(NUM_CHANNELS)]
+        self._title = title
+        self._duration_secs = duration_secs
+        self._progress_secs = progress_secs
+        self._channels = [Channel(num=i + 1) for i in range(NUM_CHANNELS)]
 
-        self.needs_redraw = False
+        self._needs_redraw = False
 
         self._colors = [[OFF] * NOTES_PER_CHANNEL for _ in range(NUM_CHANNELS)]
+
+    @property
+    def title(self) -> str:
+        return self._title
+
+    @property
+    def duration_secs(self) -> float:
+        return self._duration_secs
+
+    @property
+    def progress_secs(self) -> float:
+        return self._progress_secs
+
+    @property
+    def needs_redraw(self) -> bool:
+        return self._needs_redraw
 
     @property
     def colors(self) -> list[list[RGBColor]]:
@@ -75,36 +92,36 @@ class Display:
         """
         Updates the internal state with the given MIDI message.
         """
-        self.progress_secs = progress_secs
+        self._progress_secs = progress_secs
         match message.type:
             case "note_on":
-                channel = self.channels[message.channel]
+                channel = self._channels[message.channel]
                 channel.velocities[message.note] = message.velocity
                 self.set_note_color(channel, message.note)
 
             case "note_off":
-                channel = self.channels[message.channel]
+                channel = self._channels[message.channel]
                 channel.velocities[message.note] = 0
                 self.set_note_color(channel, message.note)
 
             case "program_change":
-                channel = self.channels[message.channel]
+                channel = self._channels[message.channel]
                 channel.program = message.program
                 self.recolor_channel(channel)
 
             case "control_change":
-                channel = self.channels[message.channel]
+                channel = self._channels[message.channel]
                 match message.control:
                     case 7:
                         channel.volume = message.value
                         self.recolor_channel(channel)
 
-    def recolor_channel(self, channel: Channel):
+    def recolor_channel(self, channel: Channel) -> None:
         for note in range(NOTES_PER_CHANNEL):
             self.set_note_color(channel, note)
 
     def set_note_color(self, channel: Channel, note: int) -> None:
-        old_color = self._colors[channel.num-1][note]
+        old_color = self._colors[channel.num - 1][note]
 
         velocity = channel.velocities[note]
         if channel.volume == 0 or velocity == 0:
@@ -115,16 +132,21 @@ class Display:
             sat = 0 if channel.num == PERCUSSION_CHANNEL else 1  # Make percussion white
 
             volume_fraction = channel.volume / 0x7F
-            val = velocity / 127 * volume_fraction  # louder => brighter
+            val = velocity / 0x7F * volume_fraction  # louder => brighter
 
             new_color = RGBColor.from_hsv(hue, sat, val)
 
         if new_color != old_color:
-            self._colors[channel.num-1][note] = new_color
-            self.needs_redraw = True
+            self._colors[channel.num - 1][note] = new_color
+            self._needs_redraw = True
 
 
-def to_panel(display: Display, with_instruments: bool = True, lower_limit: int = 0, note_range: int = 100) -> Panel:
+def to_panel(
+    display: Display,
+    with_instruments: bool = True,
+    lower_limit: int = 0,
+    note_range: int = 100,
+) -> Panel:
     """
     Returns a rich Panel representing the currently playing notes.
     """
@@ -136,9 +158,7 @@ def to_panel(display: Display, with_instruments: bool = True, lower_limit: int =
     for channel_num, colors in enumerate(display.colors, start=1):
         notes: list[Text | str] = []
 
-        for color in islice(
-            colors, lower_limit, upper_limit
-        ):
+        for color in islice(colors, lower_limit, upper_limit):
             if color is not OFF:
                 style = Style(color=Color.from_rgb(*color))
                 notes.append(Text(FILLED_RECTANGLE, style=style))
@@ -175,7 +195,5 @@ def to_panel(display: Display, with_instruments: bool = True, lower_limit: int =
         title=f"[white]{display.title}[/white]",
         subtitle=f"[white]{pos_td} / {duration_td}[/white]",
         subtitle_align="right",
-        style=Style(
-            bgcolor=Color.from_rgb(0, 0, 0), color=Color.from_rgb(32, 32, 32)
-        ),
+        style=Style(bgcolor=Color.from_rgb(0, 0, 0), color=Color.from_rgb(32, 32, 32)),
     )
